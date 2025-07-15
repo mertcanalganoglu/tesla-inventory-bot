@@ -10,13 +10,14 @@ import (
 )
 
 const (
-	apiURL      = `https://www.tesla.com/inventory/api/v4/inventory-results?query=%7B%22query%22%3A%7B%22model%22%3A%22my%22%2C%22condition%22%3A%22new%22%2C%22options%22%3A%7B%7D%2C%22arrangeby%22%3A%22Price%22%2C%22order%22%3A%22asc%22%2C%22market%22%3A%22DE%22%2C%22language%22%3A%22de%22%2C%22super_region%22%3A%22north%20america%22%7D%2C%22offset%22%3A0%2C%22count%22%3A24%2C%22outsideOffset%22%3A0%2C%22outsideSearch%22%3Afalse%2C%22isFalconDeliverySelectionEnabled%22%3Atrue%2C%22version%22%3A%22v2%22%7D`
 	botToken    = "8047920092:AAGDis_dQ1sjwopmR9MXXawrctPh4fNAZ4w"
 	chatID      = "8047920092"
-	checkPeriod = 6 * time.Second
+	checkPeriod = 60 * time.Second
 )
 
-type Response struct {
+var seen = make(map[string]bool)
+
+type ApiResponse struct {
 	Results []struct {
 		VIN         string   `json:"VIN"`
 		Price       float64  `json:"Price"`
@@ -26,7 +27,34 @@ type Response struct {
 	} `json:"results"`
 }
 
-var seen = make(map[string]bool)
+func buildURL() string {
+	query := map[string]interface{}{
+		"query": map[string]interface{}{
+			"model":        "my",
+			"condition":    "new",
+			"options":      map[string]interface{}{},
+			"arrangeby":    "Price",
+			"order":        "asc",
+			"market":       "DE",
+			"language":     "de",
+			"super_region": "north america",
+		},
+		"offset":                          0,
+		"count":                           24,
+		"outsideOffset":                   0,
+		"outsideSearch":                   false,
+		"isFalconDeliverySelectionEnabled": true,
+		"version":                         "v2",
+	}
+
+	j, err := json.Marshal(query)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	escaped := url.QueryEscape(string(j))
+	return fmt.Sprintf("https://www.tesla.com/inventory/api/v4/inventory-results?query=%s", escaped)
+}
 
 func sendTelegram(msg string) {
 	tgURL := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", botToken)
@@ -40,7 +68,7 @@ func sendTelegram(msg string) {
 	}
 }
 
-func fetchInventory() {
+func fetchInventory(apiURL string) {
 	resp, err := http.Get(apiURL)
 	if err != nil {
 		log.Println("API hatası:", err)
@@ -48,7 +76,7 @@ func fetchInventory() {
 	}
 	defer resp.Body.Close()
 
-	var data Response
+	var data ApiResponse
 	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
 		log.Println("JSON parse hatası:", err)
 		return
@@ -86,7 +114,8 @@ func main() {
 	defer ticker.Stop()
 
 	for {
-		fetchInventory()
+		apiURL := buildURL()
+		fetchInventory(apiURL)
 		<-ticker.C
 	}
 }

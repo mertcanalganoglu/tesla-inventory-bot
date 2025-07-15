@@ -1,3 +1,3 @@
-module tesla-api-bot-myrwd
+module tesla-api-bot-fixed
 
 go 1.20

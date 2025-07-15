@@ -1,6 +1,6 @@
-# Tesla Inventory API Bot 🚗 (MYRWD)
+# Tesla Inventory API Bot 🚗 (MYRWD, URL Fix)
 
-Tesla'nın resmi API'sini kullanarak sadece `MYRWD` trimindeki araçları kontrol eder ve Telegram'a bildirir.
+Tesla'nın resmi API'sini doğru encode edilmiş URL ile kullanır, yalnızca `MYRWD` olanları filtreler ve Telegram'a bildirir.
 
 ---
 
@@ -14,7 +14,7 @@ Tesla'nın resmi API'sini kullanarak sadece `MYRWD` trimindeki araçları kontro
 ### 1️⃣ Repo'yu klonla
 ```
 git clone <senin-github-repon>
-cd tesla-api-bot-myrwd
+cd tesla-api-bot-fixed
 ```
 
 ### 2️⃣ Modülleri yükle
@@ -39,11 +39,11 @@ go build -o tesla-bot
 
 ## 📋 Özellikler
 ✅ Resmi API kullanır  
-✅ Sadece `MYRWD` trim olanları filtreler  
-✅ Fiyat, renk, VIN, sipariş linki gönderir  
+✅ URL parametresini programatik olarak ve doğru encode eder  
+✅ Sadece `MYRWD` olanları filtreler  
+✅ Fiyat, VIN, sipariş linki gönderir  
 ✅ 60 saniyede bir kontrol eder  
-✅ Cloudflare & bot engeli yok  
-✅ Hızlı & stabil
+✅ Telegram'a bildirir
 
 ---
 
