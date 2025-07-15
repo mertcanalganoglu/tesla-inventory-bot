@@ -1,17 +1,18 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
-	"strings"
 	"time"
 )
 
 const (
-	apiURL      = "https://www.tesla.com/coinorder/api/v4/inventory-results?query=%7B%22query%22%3A%7B%22model%22%3A%22my%22%2C%22condition%22%3A%22new%22%2C%22options%22%3A%7B%7D%2C%22arrangeby%22%3A%22Price%22%2C%22order%22%3A%22asc%22%2C%22market%22%3A%22TR%22%2C%22language%22%3A%22tr%22%2C%22super_region%22%3A%22north%20america%22%2C%22lng%22%3A28.9533%2C%22lat%22%3A41.0145%2C%22zip%22%3A%2234096%22%2C%22range%22%3A0%7D%2C%22offset%22%3A0%2C%22count%22%3A24%2C%22outsideOffset%22%3A0%2C%22outsideSearch%22%3Afalse%2C%22isFalconDeliverySelectionEnabled%22%3Atrue%2C%22version%22%3A%22v2%22%7D"
+	apiURL      = "https://www.tesla.com/coinorder/api/v4/inventory-results"
 	botToken    = "8047920092:AAGDis_dQ1sjwopmR9MXXawrctPh4fNAZ4w"
 	chatID      = "8047920092"
 	checkPeriod = 6 * time.Second
@@ -42,21 +43,57 @@ func sendTelegram(msg string) {
 }
 
 func fetchInventory() {
-	resp, err := http.Get(apiURL)
+	// JSON gövde
+	query := map[string]interface{}{
+		"query": map[string]interface{}{
+			"model":       "my",
+			"condition":   "new",
+			"options":     map[string]interface{}{},
+			"arrangeby":   "Price",
+			"order":       "asc",
+			"market":      "TR",
+			"language":    "tr",
+			"super_region": "north america",
+			"lng":         28.9533,
+			"lat":         41.0145,
+			"zip":         "34096",
+			"range":       0,
+		},
+		"offset":                          0,
+		"count":                           24,
+		"outsideOffset":                   0,
+		"outsideSearch":                   false,
+		"isFalconDeliverySelectionEnabled": true,
+		"version":                         "v2",
+	}
+
+	body, _ := json.Marshal(query)
+
+	req, err := http.NewRequest("POST", apiURL, bytes.NewBuffer(body))
+	if err != nil {
+		log.Println("Request oluşturulamadı:", err)
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
 	if err != nil {
 		log.Println("API hatası:", err)
 		return
 	}
 	defer resp.Body.Close()
 
+	resBody, _ := io.ReadAll(resp.Body)
+
 	var data ApiResponse
-	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+	if err := json.Unmarshal(resBody, &data); err != nil {
 		log.Println("JSON parse hatası:", err)
 		return
 	}
 
 	for _, car := range data.Results {
-		if strings.TrimSpace(car.TrimName) != "MYRWD" {
+		if car.TrimName != "MYRWD" {
 			continue
 		}
 
