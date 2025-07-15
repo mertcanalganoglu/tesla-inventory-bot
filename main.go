@@ -13,10 +13,10 @@ import (
 )
 
 const (
-	teslaURL    = "https://www.tesla.com/tr_tr/inventory/new/my"
+	teslaURL    = "https://www.tesla.com/inventory/new/my" // URL'yi tarayıcıdan kontrol et!
 	botToken    = "8047920092:AAGDis_dQ1sjwopmR9MXXawrctPh4fNAZ4w"
 	chatID      = "8047920092"
-	checkPeriod = 15 * time.Second
+	checkPeriod = 60 * time.Second
 )
 
 var seen = make(map[string]bool)
@@ -36,21 +36,21 @@ func sendTelegram(msg string) {
 }
 
 func fetchInventory() ([]string, error) {
-	// HTTP client that disables HTTP/2
+	// HTTP client: HTTP/1.1 ve timeout
 	tr := &http.Transport{
 		TLSNextProto: make(map[string]func(string, *tls.Conn) http.RoundTripper),
 	}
 	client := &http.Client{
-        Timeout: 10 * time.Second,
-        Transport: tr,
-    }
+		Timeout:   30 * time.Second,
+		Transport: tr,
+	}
 
 	req, err := http.NewRequest("GET", teslaURL, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0 Safari/537.36")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36")
 
 	resp, err := client.Do(req)
 	if err != nil {
