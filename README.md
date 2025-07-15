@@ -1,13 +1,11 @@
-# Tesla Inventory Bot 🚗 (chromedp)
+# Tesla Inventory API Bot 🚗 (MYRWD)
 
-Tesla envanterinde Rear-Wheel Drive araçları kontrol eder.  
-Headless Chrome kullanarak Cloudflare & JS engellerini aşar.
+Tesla'nın resmi API'sini kullanarak sadece `MYRWD` trimindeki araçları kontrol eder ve Telegram'a bildirir.
 
 ---
 
 ## 🚀 Gereksinimler
-✅ Go ≥ 1.20  
-✅ Chrome veya Chromium yüklü
+✅ Go ≥ 1.20
 
 ---
 
@@ -16,7 +14,7 @@ Headless Chrome kullanarak Cloudflare & JS engellerini aşar.
 ### 1️⃣ Repo'yu klonla
 ```
 git clone <senin-github-repon>
-cd tesla-inventory-bot-chromedp
+cd tesla-api-bot-myrwd
 ```
 
 ### 2️⃣ Modülleri yükle
@@ -40,13 +38,14 @@ go build -o tesla-bot
 ---
 
 ## 📋 Özellikler
-✅ Headless tarayıcı ile sayfayı yükler  
-✅ Cloudflare & bot korumalarına takılmaz  
-✅ Rear-Wheel Drive geçen içerikleri arar  
-✅ HTML'i `page.html` olarak kaydeder (isteğe bağlı)
+✅ Resmi API kullanır  
+✅ Sadece `MYRWD` trim olanları filtreler  
+✅ Fiyat, renk, VIN, sipariş linki gönderir  
+✅ 60 saniyede bir kontrol eder  
+✅ Cloudflare & bot engeli yok  
+✅ Hızlı & stabil
 
 ---
 
 ## 🔗 Notlar
-- Daha detaylı parse ve Telegram bildirimi için `parseInventory()` fonksiyonunu genişletebilirsin.
-- 45s timeout ile çalışır.
+- Telegram bot token ve chat ID'yi kodda değiştirmeyi unutma.
