@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"fmt"
 	"log"
 	"net/http"
@@ -14,7 +15,7 @@ import (
 const (
 	teslaURL    = "https://www.tesla.com/inventory/new/my"
 	botToken    = "8047920092:AAGDis_dQ1sjwopmR9MXXawrctPh4fNAZ4w"
-	chatID      = "8047920092" // kendi chat id’n
+	chatID      = "8047920092"
 	checkPeriod = 6 * time.Second
 )
 
@@ -35,7 +36,20 @@ func sendTelegram(msg string) {
 }
 
 func fetchInventory() ([]string, error) {
-	resp, err := http.Get(teslaURL)
+	// HTTP client that disables HTTP/2
+	tr := &http.Transport{
+		TLSNextProto: make(map[string]func(string, *tls.Conn) http.RoundTripper),
+	}
+	client := &http.Client{Transport: tr}
+
+	req, err := http.NewRequest("GET", teslaURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0 Safari/537.36")
+
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +65,6 @@ func fetchInventory() ([]string, error) {
 		var model, price, color, vin, orderLink string
 		isRWD := false
 
-		// Model bilgisi
 		if title := s.Find("h2").Text(); title != "" {
 			model = strings.TrimSpace(title)
 			if strings.Contains(strings.ToLower(model), "rear") {
@@ -59,7 +72,6 @@ func fetchInventory() ([]string, error) {
 			}
 		}
 
-		// Özelliklerde rear kontrolü ve VIN bul
 		s.Find(".vehicle-attribute").Each(func(j int, attr *goquery.Selection) {
 			txt := strings.ToLower(attr.Text())
 			if strings.Contains(txt, "rear") {
@@ -122,7 +134,7 @@ func check() {
 }
 
 func main() {
-	log.Println("Tesla *Arkadan Çekişli* envanter botu başlıyor…")
+	log.Println("Tesla *Rear-Wheel Drive* envanter botu başlıyor…")
 	check()
 
 	ticker := time.NewTicker(checkPeriod)
