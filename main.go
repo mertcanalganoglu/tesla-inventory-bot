@@ -1,152 +1,53 @@
 package main
 
 import (
-	"crypto/tls"
+	"context"
 	"fmt"
 	"log"
-	"net/http"
-	"net/url"
+	"os"
 	"strings"
 	"time"
 
-	"github.com/PuerkitoBio/goquery"
+	"github.com/chromedp/chromedp"
 )
-
-const (
-	teslaURL    = "https://www.tesla.com/inventory/new/my" // URL'yi tarayıcıdan kontrol et!
-	botToken    = "8047920092:AAGDis_dQ1sjwopmR9MXXawrctPh4fNAZ4w"
-	chatID      = "8047920092"
-	checkPeriod = 60 * time.Second
-)
-
-var seen = make(map[string]bool)
-
-func sendTelegram(msg string) {
-	apiURL := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", botToken)
-	resp, err := http.PostForm(apiURL, url.Values{
-		"chat_id":    {chatID},
-		"text":       {msg},
-		"parse_mode": {"Markdown"},
-	})
-	if err != nil {
-		log.Println("Telegram gönderim hatası:", err)
-		return
-	}
-	defer resp.Body.Close()
-}
-
-func fetchInventory() ([]string, error) {
-	// HTTP client: HTTP/1.1 ve timeout
-	tr := &http.Transport{
-		TLSNextProto: make(map[string]func(string, *tls.Conn) http.RoundTripper),
-	}
-	client := &http.Client{
-		Timeout:   30 * time.Second,
-		Transport: tr,
-	}
-
-	req, err := http.NewRequest("GET", teslaURL, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	doc, err := goquery.NewDocumentFromReader(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	var vehicles []string
-	doc.Find("div[data-test='vehicleCard']").Each(func(i int, s *goquery.Selection) {
-		var model, price, color, vin, orderLink string
-		isRWD := false
-
-		if title := s.Find("h2").Text(); title != "" {
-			model = strings.TrimSpace(title)
-			if strings.Contains(strings.ToLower(model), "rear") {
-				isRWD = true
-			}
-		}
-
-		s.Find(".vehicle-attribute").Each(func(j int, attr *goquery.Selection) {
-			txt := strings.ToLower(attr.Text())
-			if strings.Contains(txt, "rear") {
-				isRWD = true
-			}
-			if strings.HasPrefix(txt, "vin") {
-				vin = strings.TrimSpace(attr.Text())
-			}
-		})
-
-		if !isRWD {
-			return
-		}
-
-		if p := s.Find(".vehicle-price").Text(); p != "" {
-			price = strings.TrimSpace(p)
-		}
-
-		if c := s.Find(".color-name").Text(); c != "" {
-			color = strings.TrimSpace(c)
-		}
-
-		if link, exists := s.Find("a[data-test='vehicleCardCTA']").Attr("href"); exists {
-			orderLink = fmt.Sprintf("https://www.tesla.com%s", link)
-		}
-
-		if vin == "" {
-			vinText := s.Find("div:contains('VIN')").Text()
-			if vinText != "" {
-				vin = strings.TrimSpace(vinText)
-			}
-		}
-
-		message := fmt.Sprintf(
-			"🚗 *%s*\n💰 *Fiyat:* %s\n🎨 *Renk:* %s\n🔢 *VIN:* %s\n\n🔗 [Sipariş Et](%s)",
-			model, price, color, vin, orderLink,
-		)
-
-		if message != "" && !seen[message] {
-			vehicles = append(vehicles, message)
-			seen[message] = true
-		}
-	})
-	return vehicles, nil
-}
-
-func check() {
-	vehicles, err := fetchInventory()
-	if err != nil {
-		log.Println("Envanter kontrol hatası:", err)
-		return
-	}
-
-	for _, v := range vehicles {
-		log.Println("Yeni *Rear-Wheel Drive* araç bulundu:")
-		log.Println(v)
-		sendTelegram(v)
-	}
-	log.Printf("Kontrol tamamlandı. %d araç bildirildi.\n", len(vehicles))
-}
 
 func main() {
-	log.Println("Tesla *Rear-Wheel Drive* envanter botu başlıyor…")
-	check()
+	ctx, cancel := chromedp.NewContext(
+		context.Background(),
+	)
+	defer cancel()
 
-	ticker := time.NewTicker(checkPeriod)
-	defer ticker.Stop()
+	// timeout ile context
+	ctx, cancel = context.WithTimeout(ctx, 45*time.Second)
+	defer cancel()
 
-	for {
-		select {
-		case <-ticker.C:
-			check()
-		}
+	url := "https://www.tesla.com/inventory/new/my"
+
+	var html string
+	err := chromedp.Run(ctx,
+		chromedp.Navigate(url),
+		chromedp.Sleep(5*time.Second), // biraz bekle ki JS yüklensin
+		chromedp.OuterHTML("html", &html),
+	)
+	if err != nil {
+		log.Fatalf("Sayfa yüklenemedi: %v", err)
+	}
+
+	parseInventory(html)
+}
+
+func parseInventory(html string) {
+	fmt.Println("Sayfa başarıyla alındı. Rear-Wheel Drive araçlar aranıyor...")
+	if strings.Contains(html, "Rear-Wheel Drive") {
+		fmt.Println("✅ Rear-Wheel Drive bulundu!")
+		// Burada detaylı parse ve telegram bildirimi ekleyebilirsin
+	} else {
+		fmt.Println("🚫 Rear-Wheel Drive bulunamadı.")
+	}
+
+	// opsiyonel: html dosyaya yazmak için
+	err := os.WriteFile("page.html", []byte(html), 0644)
+	if err != nil {
+		log.Printf("HTML dosyası kaydedilemedi: %v", err)
 	}
 }

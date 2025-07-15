@@ -1,28 +1,27 @@
-# Tesla Inventory Telegram Bot 🚗
+# Tesla Inventory Bot 🚗 (chromedp)
 
-Tesla envanterinde sadece **Standard Range** olan araçları takip eder, renk, fiyat, VIN ve sipariş linkiyle birlikte Telegram’a bildirir.
+Tesla envanterinde Rear-Wheel Drive araçları kontrol eder.  
+Headless Chrome kullanarak Cloudflare & JS engellerini aşar.
 
 ---
 
-## 🚀 Kurulum
+## 🚀 Gereksinimler
+✅ Go ≥ 1.20  
+✅ Chrome veya Chromium yüklü
 
-### 1️⃣ Repo’yu klonla
+---
+
+## 🔧 Kurulum
+
+### 1️⃣ Repo'yu klonla
 ```
-git clone <senin github linkin>
-cd tesla-inventory-bot
+git clone <senin-github-repon>
+cd tesla-inventory-bot-chromedp
 ```
 
-### 2️⃣ Go modüllerini yükle
+### 2️⃣ Modülleri yükle
 ```
 go mod tidy
-```
-
-### 3️⃣ `main.go` içinde bot token ve chat ID kontrol et
-```go
-const (
-	botToken = "8047920092:AAGDis_dQ1sjwopmR9MXXawrctPh4fNAZ4w"
-	chatID   = "8047920092"
-)
 ```
 
 ---
@@ -32,7 +31,7 @@ const (
 go run main.go
 ```
 
-veya derleyip binary oluştur:
+veya binary yap:
 ```
 go build -o tesla-bot
 ./tesla-bot
@@ -40,14 +39,14 @@ go build -o tesla-bot
 
 ---
 
-## ⏰ Özellikler
-✅ Sadece “Standard” geçen araçları bildirir  
-✅ Renk, fiyat, VIN ve sipariş linkini gönderir  
-✅ 5 dakikada bir kontrol eder  
-✅ Tek binary ile çalışır  
+## 📋 Özellikler
+✅ Headless tarayıcı ile sayfayı yükler  
+✅ Cloudflare & bot korumalarına takılmaz  
+✅ Rear-Wheel Drive geçen içerikleri arar  
+✅ HTML'i `page.html` olarak kaydeder (isteğe bağlı)
 
 ---
 
-## 📋 Notlar
-- Tesla’nın HTML yapısı değişirse `.Find()` seçicileri güncellemen gerekebilir.
-- Botun sana mesaj atabilmesi için önce ona `/start` yazmalısın.
+## 🔗 Notlar
+- Daha detaylı parse ve Telegram bildirimi için `parseInventory()` fonksiyonunu genişletebilirsin.
+- 45s timeout ile çalışır.
