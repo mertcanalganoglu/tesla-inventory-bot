@@ -14,8 +14,8 @@ import (
 const (
 	teslaURL    = "https://www.tesla.com/inventory/new/my"
 	botToken    = "8047920092:AAGDis_dQ1sjwopmR9MXXawrctPh4fNAZ4w"
-	chatID      = "8047920092"
-	checkPeriod = 5 * time.Minute
+	chatID      = "8047920092" // kendi chat id’n
+	checkPeriod = 6 * time.Second
 )
 
 var seen = make(map[string]bool)
@@ -49,26 +49,28 @@ func fetchInventory() ([]string, error) {
 	var vehicles []string
 	doc.Find("div[data-test='vehicleCard']").Each(func(i int, s *goquery.Selection) {
 		var model, price, color, vin, orderLink string
-		isStandard := false
+		isRWD := false
 
+		// Model bilgisi
 		if title := s.Find("h2").Text(); title != "" {
 			model = strings.TrimSpace(title)
-			if strings.Contains(strings.ToLower(model), "standard") {
-				isStandard = true
+			if strings.Contains(strings.ToLower(model), "rear") {
+				isRWD = true
 			}
 		}
 
+		// Özelliklerde rear kontrolü ve VIN bul
 		s.Find(".vehicle-attribute").Each(func(j int, attr *goquery.Selection) {
 			txt := strings.ToLower(attr.Text())
-			if strings.Contains(txt, "standard") {
-				isStandard = true
+			if strings.Contains(txt, "rear") {
+				isRWD = true
 			}
-			if strings.HasPrefix(strings.ToLower(txt), "vin") {
+			if strings.HasPrefix(txt, "vin") {
 				vin = strings.TrimSpace(attr.Text())
 			}
 		})
 
-		if !isStandard {
+		if !isRWD {
 			return
 		}
 
@@ -112,7 +114,7 @@ func check() {
 	}
 
 	for _, v := range vehicles {
-		log.Println("Yeni *Standard Range* araç bulundu:")
+		log.Println("Yeni *Rear-Wheel Drive* araç bulundu:")
 		log.Println(v)
 		sendTelegram(v)
 	}
@@ -120,7 +122,7 @@ func check() {
 }
 
 func main() {
-	log.Println("Tesla *Standard Range* envanter botu başlıyor…")
+	log.Println("Tesla *Arkadan Çekişli* envanter botu başlıyor…")
 	check()
 
 	ticker := time.NewTicker(checkPeriod)
