@@ -13,10 +13,10 @@ import (
 )
 
 const (
-	teslaURL    = "https://www.tesla.com/inventory/new/my"
+	teslaURL    = "https://www.tesla.com/tr_tr/inventory/new/my"
 	botToken    = "8047920092:AAGDis_dQ1sjwopmR9MXXawrctPh4fNAZ4w"
 	chatID      = "8047920092"
-	checkPeriod = 6 * time.Second
+	checkPeriod = 15 * time.Second
 )
 
 var seen = make(map[string]bool)
@@ -40,7 +40,10 @@ func fetchInventory() ([]string, error) {
 	tr := &http.Transport{
 		TLSNextProto: make(map[string]func(string, *tls.Conn) http.RoundTripper),
 	}
-	client := &http.Client{Transport: tr}
+	client := &http.Client{
+        Timeout: 10 * time.Second,
+        Transport: tr,
+    }
 
 	req, err := http.NewRequest("GET", teslaURL, nil)
 	if err != nil {
