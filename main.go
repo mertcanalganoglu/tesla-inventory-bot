@@ -249,6 +249,10 @@ func fetchAndProcess() {
 
 	if len(allVehicles) == 0 {
 		log.Printf("ℹ️ Envanterde araç bulunamadı")
+
+		// Araba yoksa da Telegram'a bildirim gönder
+		msg := "🔍 *Tesla Envanter Kontrolü*\n\n❌ Şu anda envanterde araç bulunamadı.\n\n⏰ Kontrol zamanı: " + time.Now().Format("15:04:05")
+		sendTelegram(msg)
 		return
 	}
 
