@@ -6,61 +6,130 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/rand"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
+
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-const (
-	botToken    = "8047920092:AAGDis_dQ1sjwopmR9MXXawrctPh4fNAZ4w"
-	chatID      = "1298975161"
-	checkPeriod = 60 * time.Second
+// Telegram bot token ve chat ID
+var (
+	botToken = "YOUR_BOT_TOKEN_HERE" // Buraya bot token'ınızı yazın
+	chatID   = int64(0)              // Buraya chat ID'nizi yazın
 )
 
-type ApiResponse struct {
-	Results json.RawMessage `json:"results"`
-}
+// Session cookie'leri
+var sessionCookies []*http.Cookie
 
+// Bildirilen araçları takip et
 var notified = make(map[string]bool)
 
+// ApiResponse yapısı
+type ApiResponse struct {
+	Results struct {
+		Exact              []json.RawMessage `json:"exact"`
+		Approximate        []json.RawMessage `json:"approximate"`
+		ApproximateOutside []json.RawMessage `json:"approximateOutside"`
+	} `json:"results"`
+	TotalMatchesFound int `json:"total_matches_found"`
+}
+
+// User-Agent rotasyonu
+var userAgents = []string{
+	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
+	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",
+	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36",
+}
+
+func getRandomUserAgent() string {
+	return userAgents[rand.Intn(len(userAgents))]
+}
+
 func sendTelegram(msg string) {
-	tgURL := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", botToken)
-
-	data := url.Values{}
-	data.Set("chat_id", chatID)
-	data.Set("text", msg)
-	data.Set("parse_mode", "Markdown")
-	data.Set("disable_web_page_preview", "true")
-
-	client := &http.Client{Timeout: 10 * time.Second}
-	req, err := http.NewRequest("POST", tgURL, strings.NewReader(data.Encode()))
-	if err != nil {
-		log.Printf("❌ Telegram isteği oluşturulamadı: %v", err)
+	if botToken == "YOUR_BOT_TOKEN_HERE" || chatID == 0 {
+		log.Printf("⚠️ Telegram bot token veya chat ID ayarlanmamış")
 		return
 	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	bot, err := tgbotapi.NewBotAPI(botToken)
+	if err != nil {
+		log.Printf("❌ Telegram bot oluşturulamadı: %v", err)
+		return
+	}
+
+	message := tgbotapi.NewMessage(chatID, msg)
+	message.ParseMode = "Markdown"
+	message.DisableWebPagePreview = true
+
+	_, err = bot.Send(message)
+	if err != nil {
+		log.Printf("❌ Telegram mesajı gönderilemedi: %v", err)
+	} else {
+		log.Printf("✅ Telegram mesajı gönderildi")
+	}
+}
+
+// Health check endpoint'i
+func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`{"status":"OK","timestamp":"` + time.Now().Format(time.RFC3339) + `"}`))
+}
+
+func getSessionCookies() error {
+	client := &http.Client{Timeout: 30 * time.Second}
+	req, err := http.NewRequest("GET", "https://www.tesla.com/tr_TR/inventory", nil)
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("User-Agent", getRandomUserAgent())
+	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8")
+	req.Header.Set("Accept-Language", "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7")
+	req.Header.Set("Accept-Encoding", "gzip, deflate, br")
+	req.Header.Set("Cache-Control", "no-cache")
+	req.Header.Set("Pragma", "no-cache")
+	req.Header.Set("Sec-Ch-Ua", `"Google Chrome";v="137", "Chromium";v="137", "Not/A)Brand";v="24"`)
+	req.Header.Set("Sec-Ch-Ua-Mobile", "?0")
+	req.Header.Set("Sec-Ch-Ua-Platform", `"macOS"`)
+	req.Header.Set("Sec-Fetch-Dest", "document")
+	req.Header.Set("Sec-Fetch-Mode", "navigate")
+	req.Header.Set("Sec-Fetch-Site", "none")
+	req.Header.Set("Sec-Fetch-User", "?1")
+	req.Header.Set("Upgrade-Insecure-Requests", "1")
 
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Printf("❌ Telegram isteği başarısız: %v", err)
-		return
+		return err
 	}
 	defer resp.Body.Close()
 
-	body, _ := io.ReadAll(resp.Body)
-
-	if resp.StatusCode != http.StatusOK {
-		log.Printf("❌ Telegram API hatası: %s\nYanıt: %s", resp.Status, string(body))
-		return
+	sessionCookies = resp.Cookies()
+	log.Printf("✅ Session cookie'leri alındı: %d adet", len(sessionCookies))
+	for i, cookie := range sessionCookies {
+		log.Printf("🍪 Cookie %d: %s", i+1, cookie.Name+"="+cookie.Value)
 	}
 
-	log.Printf("✅ Telegram mesajı gönderildi. Yanıt: %s", string(body))
+	return nil
 }
 
 func fetchAndProcess() {
+	// Session cookie'leri yoksa al
+	if len(sessionCookies) == 0 {
+		if err := getSessionCookies(); err != nil {
+			log.Printf("❌ Session cookie'leri alınamadı: %v", err)
+			return
+		}
+	}
+
+	// Gerçek browser isteğindeki URL'yi kullan
 	baseURL := "https://www.tesla.com/coinorder/api/v4/inventory-results"
 
+	// Gerçek browser isteğindeki query yapısını kullan
 	queryPayload := map[string]interface{}{
 		"query": map[string]interface{}{
 			"model":        "my",
@@ -71,9 +140,9 @@ func fetchAndProcess() {
 			"market":       "TR",
 			"language":     "tr",
 			"super_region": "north america",
-			"lng":          28.9533,
-			"lat":          41.0145,
-			"zip":          "34791",
+			"lng":          "",
+			"lat":          "",
+			"zip":          "",
 			"range":        0,
 		},
 		"offset":                           0,
@@ -104,21 +173,27 @@ func fetchAndProcess() {
 		return
 	}
 
-    req.Header.Set("accept", `text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7`)
-    req.Header.Set("accept-encoding", `gzip, deflate, br, zstd`)
-    req.Header.Set("accept-language", `tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7`)
-    req.Header.Set("cache-control", `no-cache`)
-    req.Header.Set("pragma", `no-cache`)
-    req.Header.Set("priority", `u=0, i`)
-    req.Header.Set("sec-ch-ua", `"Not)A;Brand";v="8", "Chromium";v="138", "Google Chrome";v="138"`)
-    req.Header.Set("sec-ch-ua-mobile", `?0`)
-    req.Header.Set("sec-ch-ua-platform", `"macOS"`)
-    req.Header.Set("sec-fetch-dest", `document`)
-    req.Header.Set("sec-fetch-mode", `navigate`)
-    req.Header.Set("sec-fetch-site", `none`)
-    req.Header.Set("sec-fetch-user", `?1`)
-    req.Header.Set("upgrade-insecure-requests", `1`)
-    req.Header.Set("user-agent", `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36`)
+	// Session cookie'lerini ekle
+	for _, cookie := range sessionCookies {
+		req.AddCookie(cookie)
+	}
+
+	// Gerçek browser headers'ı kullan
+	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7")
+	req.Header.Set("Accept-Encoding", "gzip, deflate, br, zstd")
+	req.Header.Set("Accept-Language", "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7")
+	req.Header.Set("Cache-Control", "no-cache")
+	req.Header.Set("Pragma", "no-cache")
+	req.Header.Set("Priority", "u=0, i")
+	req.Header.Set("Sec-Ch-Ua", `"Google Chrome";v="137", "Chromium";v="137", "Not/A)Brand";v="24"`)
+	req.Header.Set("Sec-Ch-Ua-Mobile", "?0")
+	req.Header.Set("Sec-Ch-Ua-Platform", `"macOS"`)
+	req.Header.Set("Sec-Fetch-Dest", "document")
+	req.Header.Set("Sec-Fetch-Mode", "navigate")
+	req.Header.Set("Sec-Fetch-Site", "none")
+	req.Header.Set("Sec-Fetch-User", "?1")
+	req.Header.Set("Upgrade-Insecure-Requests", "1")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36")
 
 	log.Println("🚀 GET isteği gönderiliyor...")
 	httpResp, err := client.Do(req)
@@ -150,9 +225,30 @@ func fetchAndProcess() {
 
 	log.Printf("🔷 Sunucudan gelen yanıt:\n%s", string(body))
 
+	// Access Denied kontrolü
+	if strings.Contains(string(body), "Access Denied") {
+		log.Printf("❌ Access Denied - Cookie'ler yenileniyor...")
+		sessionCookies = nil         // Cookie'leri temizle
+		time.Sleep(10 * time.Second) // Daha uzun bekleme
+		return
+	}
+
 	var apiResp ApiResponse
 	if err := json.Unmarshal(body, &apiResp); err != nil {
 		log.Printf("❌ JSON parse hatası (root): %v", err)
+		return
+	}
+
+	log.Printf("🔍 Toplam eşleşme: %d", apiResp.TotalMatchesFound)
+
+	// Tüm araçları birleştir
+	var allVehicles []json.RawMessage
+	allVehicles = append(allVehicles, apiResp.Results.Exact...)
+	allVehicles = append(allVehicles, apiResp.Results.Approximate...)
+	allVehicles = append(allVehicles, apiResp.Results.ApproximateOutside...)
+
+	if len(allVehicles) == 0 {
+		log.Printf("ℹ️ Envanterde araç bulunamadı")
 		return
 	}
 
@@ -166,9 +262,24 @@ func fetchAndProcess() {
 		INTERIOR       []string `json:"INTERIOR"`
 	}
 
-	if err := json.Unmarshal(apiResp.Results, &results); err != nil {
-		log.Printf("📋 Uyarı: results parse edilemedi: %v", err)
-		return
+	// Her araç için parse et
+	for _, vehicle := range allVehicles {
+		var car struct {
+			VIN            string   `json:"VIN"`
+			InventoryPrice float64  `json:"InventoryPrice"`
+			TrimName       string   `json:"TrimName"`
+			TRIM           []string `json:"TRIM"`
+			InventoryID    string   `json:"InventoryID"`
+			PAINT          []string `json:"PAINT"`
+			INTERIOR       []string `json:"INTERIOR"`
+		}
+
+		if err := json.Unmarshal(vehicle, &car); err != nil {
+			log.Printf("📋 Araç parse edilemedi: %v", err)
+			continue
+		}
+
+		results = append(results, car)
 	}
 
 	for _, car := range results {
@@ -190,6 +301,13 @@ func fetchAndProcess() {
 		interior := "Bilinmiyor"
 		if len(car.INTERIOR) > 0 {
 			interior = car.INTERIOR[0]
+		}
+
+		// Siyah dışındaki renkleri filtrele
+		paintLower := strings.ToLower(paint)
+		if strings.Contains(paintLower, "black") || strings.Contains(paintLower, "siyah") {
+			log.Printf("⚫ Siyah araç atlandı: %s (%s)", car.VIN, paint)
+			continue
 		}
 
 		id := car.InventoryID
@@ -237,9 +355,37 @@ func escapeMarkdown(text string) string {
 }
 
 func main() {
+	// Random seed
+	rand.Seed(time.Now().UnixNano())
+
 	log.Println("📈 Tesla MYRWD bot başlıyor…")
-	ticker := time.NewTicker(checkPeriod)
+	log.Println("⚙️ Ayarlar: 5 saniyede bir kontrol, siyah dışındaki renkler")
+	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
+
+	// Health check endpoint'i
+	http.HandleFunc("/health", healthCheckHandler)
+
+	// Bot token ve chat ID'yi ortam değişkenlerinden al
+	botTokenEnv := os.Getenv("TELEGRAM_BOT_TOKEN")
+	chatIDEnv := os.Getenv("TELEGRAM_CHAT_ID")
+
+	if botTokenEnv != "" {
+		botToken = botTokenEnv
+		log.Printf("✅ Telegram bot token ortam değişkeninden alındı")
+	}
+	if chatIDEnv != "" {
+		if parsedChatID, err := fmt.Sscanf(chatIDEnv, "%d", &chatID); err == nil && parsedChatID == 1 {
+			log.Printf("✅ Telegram chat ID ortam değişkeninden alındı: %d", chatID)
+		} else {
+			log.Printf("⚠️ Telegram chat ID ortam değişkeni geçerli değil: %s", chatIDEnv)
+			chatID = 0
+		}
+	}
+
+	if botToken == "YOUR_BOT_TOKEN_HERE" || chatID == 0 {
+		log.Printf("⚠️ Telegram bot token veya chat ID ayarlanmamış - bildirimler gönderilmeyecek")
+	}
 
 	for {
 		fetchAndProcess()
