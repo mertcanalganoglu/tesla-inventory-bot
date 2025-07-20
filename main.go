@@ -364,6 +364,15 @@ func main() {
 	log.Println("📈 Tesla MYRWD bot başlıyor…")
 	log.Println("⚙️ Zamanlama: 18:00-19:00 (UTC+3) arası 5 saniyede bir, diğer zamanlarda saatte 1 kontrol")
 
+	// İlk deploy sonrası Telegram'a başlangıç mesajı gönder
+	startMsg := "🚀 *Tesla Inventory Bot Başlatıldı!*\n\n" +
+		"✅ Bot başarıyla çalışıyor\n" +
+		"⚙️ Zamanlama: 18:00-19:00 (UTC+3) arası 5 saniyede bir\n" +
+		"⏰ Diğer saatlerde: Saatte 1 kez kontrol\n" +
+		"🎯 Hedef: Model Y (MYRWD) - Siyah dışındaki renkler\n\n" +
+		"🔍 Envanter kontrolü başlıyor..."
+	sendTelegram(startMsg)
+
 	for {
 		fetchAndProcess()
 
