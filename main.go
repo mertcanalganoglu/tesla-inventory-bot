@@ -367,16 +367,17 @@ func main() {
 	for {
 		fetchAndProcess()
 
-		// Şu anki zamanı UTC+3'e çevir
-		loc, _ := time.LoadLocation("Europe/Istanbul")
+		// Europe/Istanbul time zone'u yoksa UTC+3 offset'iyle manuel oluştur
+		loc, err := time.LoadLocation("Europe/Istanbul")
+		if err != nil {
+			loc = time.FixedZone("UTC+3", 3*60*60)
+		}
 		now := time.Now().In(loc)
 		hour := now.Hour()
 
 		if hour == 18 {
-			// 18:00-18:59 arası 5 saniyede bir
 			time.Sleep(5 * time.Second)
 		} else {
-			// Diğer zamanlarda saatte 1
 			nextHour := now.Truncate(time.Hour).Add(time.Hour)
 			dur := time.Until(nextHour)
 			log.Printf("⏳ Sonraki kontrol %s sonra (saat başı)", dur.Round(time.Second))
