@@ -362,7 +362,7 @@ func main() {
 	rand.Seed(time.Now().UnixNano())
 
 	log.Println("📈 Tesla MYRWD bot başlıyor…")
-	log.Println("⚙️ Zamanlama: 18:00-19:00 (UTC+3) arası 5 saniyede bir, diğer zamanlarda saatte 1 kontrol")
+	log.Println("⚙️ Zamanlama: 18:30-19:00 (UTC+3) arası 10 saniyede bir, diğer zamanlarda saatte 1 kontrol")
 
 	// Health check endpoint'i
 	http.HandleFunc("/health", healthCheckHandler)
@@ -377,9 +377,10 @@ func main() {
 		}
 		now := time.Now().In(loc)
 		hour := now.Hour()
+		minute := now.Minute()
 
-		if hour == 18 {
-			time.Sleep(5 * time.Second)
+		if hour == 18 && minute >= 30 {
+			time.Sleep(10 * time.Second)
 		} else {
 			nextHour := now.Truncate(time.Hour).Add(time.Hour)
 			dur := time.Until(nextHour)
