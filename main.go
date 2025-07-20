@@ -17,8 +17,8 @@ import (
 
 // Telegram bot token ve chat ID
 var (
-	botToken = "YOUR_BOT_TOKEN_HERE" // Buraya bot token'ınızı yazın
-	chatID   = int64(0)              // Buraya chat ID'nizi yazın
+	botToken = "7928720060:AAEoH5rm8nSL4VEmUBayTVsVHU-L1moNIe4" // Telegram bot token'ı
+	chatID   = int64(767326245)                                 // Telegram chat ID
 )
 
 // Session cookie'leri
@@ -362,35 +362,15 @@ func main() {
 	rand.Seed(time.Now().UnixNano())
 
 	log.Println("📈 Tesla MYRWD bot başlıyor…")
-	log.Println("⚙️ Zamanlama: 18:00-19:00 (UTC+3) arası 5 saniyede bir, diğer zamanlarda saatte 1 kontrol")
+	log.Println("⚙️ Ayarlar: 5 saniyede bir kontrol, siyah dışındaki renkler")
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
 
-	// İlk deploy sonrası Telegram'a başlangıç mesajı gönder
-	startMsg := "🚀 *Tesla Inventory Bot Başlatıldı!*\n\n" +
-		"✅ Bot başarıyla çalışıyor\n" +
-		"⚙️ Zamanlama: 18:00-19:00 (UTC+3) arası 5 saniyede bir\n" +
-		"⏰ Diğer saatlerde: Saatte 1 kez kontrol\n" +
-		"🎯 Hedef: Model Y (MYRWD) - Siyah dışındaki renkler\n\n" +
-		"🔍 Envanter kontrolü başlıyor..."
-	sendTelegram(startMsg)
+	// Health check endpoint'i
+	http.HandleFunc("/health", healthCheckHandler)
 
 	for {
 		fetchAndProcess()
-
-		// Europe/Istanbul time zone'u yoksa UTC+3 offset'iyle manuel oluştur
-		loc, err := time.LoadLocation("Europe/Istanbul")
-		if err != nil {
-			loc = time.FixedZone("UTC+3", 3*60*60)
-		}
-		now := time.Now().In(loc)
-		hour := now.Hour()
-
-		if hour == 18 {
-			time.Sleep(5 * time.Second)
-		} else {
-			nextHour := now.Truncate(time.Hour).Add(time.Hour)
-			dur := time.Until(nextHour)
-			log.Printf("⏳ Sonraki kontrol %s sonra (saat başı)", dur.Round(time.Second))
-			time.Sleep(dur)
-		}
+		<-ticker.C
 	}
 }
