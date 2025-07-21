@@ -362,30 +362,16 @@ func main() {
 	rand.Seed(time.Now().UnixNano())
 
 	log.Println("📈 Tesla MYRWD bot başlıyor…")
-	log.Println("⚙️ Zamanlama: 18:30-19:00 (UTC+3) arası 10 saniyede bir, diğer zamanlarda saatte 1 kontrol")
+	log.Println("⚙️ Zamanlama: Her zaman 10 saniyede bir kontrol")
 
 	// Health check endpoint'i
 	http.HandleFunc("/health", healthCheckHandler)
 
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
+
 	for {
 		fetchAndProcess()
-
-		// Europe/Istanbul time zone'u yoksa UTC+3 offset'iyle manuel oluştur
-		loc, err := time.LoadLocation("Europe/Istanbul")
-		if err != nil {
-			loc = time.FixedZone("UTC+3", 3*60*60)
-		}
-		now := time.Now().In(loc)
-		hour := now.Hour()
-		minute := now.Minute()
-
-		if hour == 18 && minute >= 30 {
-			time.Sleep(10 * time.Second)
-		} else {
-			nextHour := now.Truncate(time.Hour).Add(time.Hour)
-			dur := time.Until(nextHour)
-			log.Printf("⏳ Sonraki kontrol %s sonra (saat başı)", dur.Round(time.Second))
-			time.Sleep(dur)
-		}
+		<-ticker.C
 	}
 }
